@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team KPI Tracking Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <span class="eyebrow">Performance workspace</span>
+                <h1>Team KPI Tracking</h1>
+                <p>Monitor, import, filter, and maintain SMART KPIs with a cleaner team dashboard.</p>
+            </div>
+            <div class="header-actions">
+                <button type="button" class="btn btn-secondary" id="importFileBtn">Import File</button>
+                <button type="button" class="btn btn-secondary" id="exportCsvBtn">Export CSV</button>
+                <button class="btn btn-primary" id="addKpiBtn">Add KPI</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section class="dashboard-section">
+                <h2>Dashboard Summary</h2>
+                <!-- Summary card icons are upgraded in script.js to keep the visual set consistent -->
+                <div class="summary-cards">
+                    <div class="card card-summary">
+                        <div class="card-label">Total KPIs</div>
+                        <div class="card-value" id="totalKpis">0</div>
+                        <div class="card-icon">📊</div>
+                    </div>
+                    <div class="card card-summary">
+                        <div class="card-label">On-track KPIs</div>
+                        <div class="card-value" id="onTrackKpis">0</div>
+                        <div class="card-icon">✅</div>
+                    </div>
+                    <div class="card card-summary">
+                        <div class="card-label">At-risk KPIs</div>
+                        <div class="card-value" id="atRiskKpis">0</div>
+                        <div class="card-icon">⚠️</div>
+                    </div>
+                    <div class="card card-summary">
+                        <div class="card-label">Off-track KPIs</div>
+                        <div class="card-value" id="offTrackKpis">0</div>
+                        <div class="card-icon">❌</div>
+                    </div>
+                    <div class="card card-summary">
+                        <div class="card-label">Completed KPIs</div>
+                        <div class="card-value" id="completedKpis">0</div>
+                        <div class="card-icon">🏆</div>
+                    </div>
+                    <div class="card card-summary">
+                        <div class="card-label">Avg Rating</div>
+                        <div class="card-value" id="avgRating">0.0</div>
+                        <div class="card-meta" id="avgRatingMeta">Target 3.0</div>
+                        <div class="card-icon">AVG</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="progress-section">
+                <div class="section-heading">
+                    <div>
+                        <h2>Progress Overview</h2>
+                        <p>Live progress cards for the KPIs that match the current filters.</p>
+                    </div>
+                    <div class="progress-actions">
+                        <div class="progress-meta" id="progressOverviewMeta"></div>
+                        <!-- Progress overview toolbar -->
+                        <div class="progress-toolbar">
+                            <label class="progress-sort-control" for="progressSortControl">
+                                <span class="progress-toolbar-label">Sort</span>
+                                <select id="progressSortControl" class="filter-select progress-toolbar-select">
+                                    <option value="status-priority" selected>Status priority</option>
+                                    <option value="progress-low-high">Progress: Low to High</option>
+                                    <option value="progress-high-low">Progress: High to Low</option>
+                                    <option value="name-asc">KPI Name: A to Z</option>
+                                    <option value="name-desc">KPI Name: Z to A</option>
+                                    <option value="owner-asc">Owner: A to Z</option>
+                                    <option value="team-asc">Team: A to Z</option>
+                                    <option value="due-date-asc">Due date: Nearest first</option>
+                                    <option value="weight-desc">Weight: High to Low</option>
+                                </select>
+                            </label>
+                            <div class="progress-view-toggle" role="group" aria-label="Progress overview view">
+                                <button type="button" class="progress-view-btn is-active" id="progressGridViewBtn" data-view="grid">Grid</button>
+                                <button type="button" class="progress-view-btn" id="progressListViewBtn" data-view="list">List</button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-sm" id="progressToggleBtn" hidden>Show More</button>
+                    </div>
+                </div>
+                <div id="progressOverview" class="progress-overview"></div>
+            </section>
+
+            <!-- Filter and Search Section -->
+            <section class="filter-section">
+                <div class="filter-heading">
+                    <div>
+                        <h2>Search And Filter</h2>
+                        <p>Narrow the KPI list by owner, team, year, or status.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-ghost" id="clearFiltersBtn">Clear Filters</button>
+                </div>
+                <div class="filter-controls">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        class="search-box" 
+                        placeholder="Search KPI name, owner, or team..."
+                    >
+                    <select id="yearFilter" class="filter-select">
+                        <option value="">All Years</option>
+                    </select>
+                    <select id="teamFilter" class="filter-select">
+                        <option value="">All Teams</option>
+                    </select>
+                    <select id="ownerFilter" class="filter-select">
+                        <option value="">All Owners</option>
+                    </select>
+                    <select id="statusFilter" class="filter-select">
+                        <option value="">All Status</option>
+                        <option value="Completed">Completed</option>
+                        <option value="On-track">On-track</option>
+                        <option value="At-risk">At-risk</option>
+                        <option value="Off-track">Off-track</option>
+                    </select>
+                </div>
+                <div class="filter-footer">
+                    <div class="result-summary" id="resultSummary">0 KPI records</div>
+                </div>
+            </section>
+
+            <!-- KPI List Section -->
+            <section class="kpi-list-section">
+                <div class="section-heading">
+                    <div>
+                        <h2>KPI Records</h2>
+                        <p>Keep the list focused on the most important KPI signals, then open row details for comments, SMART breakdown, and metadata.</p>
+                    </div>
+                    <div class="table-toolbar">
+                        <div class="table-toolbar-group">
+                            <div class="selection-summary" id="selectionSummary">No KPIs selected</div>
+                            <!-- Table density controls -->
+                            <div class="density-toggle" role="group" aria-label="Row density">
+                                <button type="button" class="density-btn is-active" id="tableComfortableBtn" data-density="comfortable">Comfortable</button>
+                                <button type="button" class="density-btn" id="tableCompactBtn" data-density="compact">Compact</button>
+                            </div>
+                        </div>
+                        <div class="table-toolbar-group table-toolbar-group-actions">
+                            <button type="button" class="btn btn-danger" id="bulkDeleteBtn" disabled>Delete Selected</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="kpi-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 30px; text-align: center;" title="Drag to reorder">⋮⋮</th>
+                                <th>KPI Name</th>
+                                <th>Owner</th>
+                                <th>Team</th>
+                                <th>Target</th>
+                                <th>Actual</th>
+                                <th>Progress</th>
+                                <th>Status</th>
+                                <th>Rating</th>
+                                <th>Mid-Year Comment</th>
+                                <th>Year-End Comment</th>
+                                <th>SMART Criteria</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="kpiTableBody">
+                            <tr class="empty-row">
+                                <td colspan="13" class="empty-message">No KPI records found</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- KPI Form Modal -->
+    <div id="kpiModal" class="modal">
+        <div class="modal-content modal-form">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New KPI</h2>
+                <button type="button" class="close-btn" id="closeModalBtn">&times;</button>
+            </div>
+
+            <form id="kpiForm" class="kpi-form">
+                <!-- Basic Information -->
+                <fieldset>
+                    <legend>Basic Information</legend>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="kpiName">KPI Name *</label>
+                            <input type="text" id="kpiName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="kpiOwner">Owner *</label>
+                            <input type="text" id="kpiOwner" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="kpiTeam">Team *</label>
+                            <input type="text" id="kpiTeam" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="kpiDepartment">Department</label>
+                            <input type="text" id="kpiDepartment">
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- Target and Actual -->
+                <fieldset>
+                    <legend>Performance Tracking</legend>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="kpiTarget">Target *</label>
+                            <input type="number" id="kpiTarget" required step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label for="kpiLastYearResult">Last Year Result</label>
+                            <input type="number" id="kpiLastYearResult" step="0.01" placeholder="Reference from last year">
+                        </div>
+                        <div class="form-group">
+                            <label for="kpiActual">Actual *</label>
+                            <input type="number" id="kpiActual" required step="0.01" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="kpiUnit">Unit *</label>
+                            <input type="text" id="kpiUnit" placeholder="e.g., %, units, hours" required>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- Dates -->
+                <fieldset>
+                    <legend>Duration</legend>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="kpiStartDate">Start Date *</label>
+                            <input type="date" id="kpiStartDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="kpiEndDate">End Date *</label>
+                            <input type="date" id="kpiEndDate" required>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- SMART Criteria -->
+                <fieldset>
+                    <legend>SMART Criteria</legend>
+                    <div class="smart-grid">
+                        <div class="form-group smart-input">
+                            <!-- SMART helper icon and hover trigger -->
+                            <div class="smart-label-row">
+                                <label for="smartSpecific" class="smart-label-main">
+                                    <span class="smart-label-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M6 6h12v12H6z"></path>
+                                            <path d="M9 9h6v6H9z"></path>
+                                        </svg>
+                                    </span>
+                                    <span>Specific</span>
+                                </label>
+                                <button type="button" class="smart-info-trigger" data-smart-key="specific" aria-label="Explain Specific criteria">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="8"></circle>
+                                        <path d="M12 10v4"></path>
+                                        <path d="M12 7h.01"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <input type="text" id="smartSpecific" placeholder="Describe what needs to be achieved...">
+                        </div>
+                        <div class="form-group smart-input">
+                            <!-- SMART helper icon and hover trigger -->
+                            <div class="smart-label-row">
+                                <label for="smartMeasurable" class="smart-label-main">
+                                    <span class="smart-label-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M5 18h14"></path>
+                                            <path d="M8 15V9"></path>
+                                            <path d="M12 15V6"></path>
+                                            <path d="M16 15v-4"></path>
+                                        </svg>
+                                    </span>
+                                    <span>Measurable</span>
+                                </label>
+                                <button type="button" class="smart-info-trigger" data-smart-key="measurable" aria-label="Explain Measurable criteria">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="8"></circle>
+                                        <path d="M12 10v4"></path>
+                                        <path d="M12 7h.01"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <input type="text" id="smartMeasurable" placeholder="Define how to measure...">
+                        </div>
+                        <div class="form-group smart-input">
+                            <!-- SMART helper icon and hover trigger -->
+                            <div class="smart-label-row">
+                                <label for="smartAchievable" class="smart-label-main">
+                                    <span class="smart-label-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M5 12l4 4 10-10"></path>
+                                        </svg>
+                                    </span>
+                                    <span>Achievable</span>
+                                </label>
+                                <button type="button" class="smart-info-trigger" data-smart-key="achievable" aria-label="Explain Achievable criteria">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="8"></circle>
+                                        <path d="M12 10v4"></path>
+                                        <path d="M12 7h.01"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <input type="text" id="smartAchievable" placeholder="Is this realistically attainable?">
+                        </div>
+                        <div class="form-group smart-input">
+                            <!-- SMART helper icon and hover trigger -->
+                            <div class="smart-label-row">
+                                <label for="smartRelevant" class="smart-label-main">
+                                    <span class="smart-label-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M12 5l7 7-7 7-7-7 7-7z"></path>
+                                            <path d="M12 9v6"></path>
+                                            <path d="M9 12h6"></path>
+                                        </svg>
+                                    </span>
+                                    <span>Relevant</span>
+                                </label>
+                                <button type="button" class="smart-info-trigger" data-smart-key="relevant" aria-label="Explain Relevant criteria">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="8"></circle>
+                                        <path d="M12 10v4"></path>
+                                        <path d="M12 7h.01"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <input type="text" id="smartRelevant" placeholder="Why is this important?">
+                        </div>
+                        <div class="form-group smart-input">
+                            <!-- SMART helper icon and hover trigger -->
+                            <div class="smart-label-row">
+                                <label for="smartTimeBound" class="smart-label-main">
+                                    <span class="smart-label-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="8"></circle>
+                                            <path d="M12 8v5l3 2"></path>
+                                        </svg>
+                                    </span>
+                                    <span>Time-bound</span>
+                                </label>
+                                <button type="button" class="smart-info-trigger" data-smart-key="timeBound" aria-label="Explain Time-bound criteria">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="8"></circle>
+                                        <path d="M12 10v4"></path>
+                                        <path d="M12 7h.01"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <input type="text" id="smartTimeBound" placeholder="What's the deadline?">
+                        </div>
+                    </div>
+                    <div id="smartWarning" class="smart-warning" style="display: none;">
+                        ⚠️ Complete all SMART criteria for better goal clarity
+                    </div>
+                </fieldset>
+
+                <!-- Remark -->
+                <fieldset>
+                    <legend>Additional</legend>
+                    <div class="form-group">
+                        <label for="kpiRemark">Remark</label>
+                        <textarea id="kpiRemark" rows="3" placeholder="Add any additional notes or comments..."></textarea>
+                    </div>
+                </fieldset>
+
+                <!-- Evaluation summary section -->
+                <fieldset class="evaluation-fieldset">
+                    <legend>Evaluation Summary</legend>
+                    <p class="fieldset-intro">Capture the final performance rating and review comments while keeping the KPI workflow familiar.</p>
+                    <div class="evaluation-layout">
+                        <!-- Evaluation layout and KPI context -->
+                        <aside class="evaluation-context-panel">
+                            <div class="evaluation-context-card">
+                                <span class="evaluation-section-kicker">KPI Performance Summary</span>
+                                <div id="evaluationKpiContext" class="evaluation-context-content"></div>
+                            </div>
+                        </aside>
+                        <div class="evaluation-workflow">
+                            <div class="evaluation-workflow-card">
+                                <div class="evaluation-step-header">
+                                    <div>
+                                        <span class="evaluation-section-kicker">Rating Decision</span>
+                                        <h3>Recommended rating and final decision</h3>
+                                    </div>
+                                    <p>Review KPI performance first, compare the recommendation with the final rating, and document any override directly below.</p>
+                                </div>
+                                <div class="evaluation-grid evaluation-rating-flow">
+                                    <div class="rating-input-column">
+                                        <div class="form-group evaluation-rating-group">
+                                            <label for="kpiRatingGrade">Selected Final Rating *</label>
+                                            <select id="kpiRatingGrade" class="filter-select rating-select" required>
+                                                <option value="1">1 - Poor</option>
+                                                <option value="2">2 - Below Expectation</option>
+                                                <option value="3" selected>3 - Meets Expectation</option>
+                                                <option value="4">4 - Exceeds Expectation</option>
+                                                <option value="5">5 - Outstanding</option>
+                                            </select>
+                                            <p class="rating-selection-helper">Choose the final rating after reviewing the calculated recommendation and business context.</p>
+                                        </div>
+                                        <div class="rating-mismatch-box is-hidden" id="ratingMismatchBox">
+                                            <span class="rating-mismatch-badge">Mismatch</span>
+                                            <p class="rating-mismatch-text">Final rating does not match the rating guide. Explain the business context, scope change, or supporting evidence below.</p>
+                                        </div>
+                                        <div class="form-group rating-justification-group" id="ratingJustificationGroup">
+                                            <label for="kpiRatingJustification" id="justificationLabel">Rating Justification & Comments</label>
+                                            <p class="rating-justification-helper" id="justificationHelperText">Add comments or explain any override of the recommended rating, including business context and supporting evidence.</p>
+                                            <textarea id="kpiRatingJustification" rows="5" placeholder="Document your rating decision, business justification, or key observations that support this final rating."></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="rating-decision-panel">
+                                        <div class="rating-suggestion" id="ratingSuggestion">Performance summary: enter Target and Actual values to calculate achievement and recommended rating.</div>
+                                        <div class="rating-matchup" id="ratingMatchup"></div>
+                                        <div class="rating-scale rating-scale-compact" id="ratingGuideScale"></div>
+                                    </div>
+                                </div>
+                                <!-- Rating criteria settings are kept available but visually separated from the evaluator workflow. -->
+                                <details class="rating-criteria-panel">
+                                    <summary>
+                                        <span>View / Adjust Rating Criteria</span>
+                                        <span class="rating-guidance-target">Adjust per KPI goal</span>
+                                    </summary>
+                                    <div class="rating-guidance">
+                                        <div class="rating-threshold-grid">
+                                            <div class="form-group">
+                                                <label for="rating2Min">Rating 2 starts at (%)</label>
+                                                <input type="number" id="rating2Min" min="0" step="1" value="70">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="rating3Min">Rating 3 starts at (%)</label>
+                                                <input type="number" id="rating3Min" min="0" step="1" value="100">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="rating4Min">Rating 4 starts at (%)</label>
+                                                <input type="number" id="rating4Min" min="0" step="1" value="110">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="rating5Min">Rating 5 starts at (%)</label>
+                                                <input type="number" id="rating5Min" min="0" step="1" value="125">
+                                            </div>
+                                        </div>
+                                        <div class="rating-guide-list" id="ratingGuidePreview">
+                                            <span class="rating-guide-item">1: Below 70% of target</span>
+                                            <span class="rating-guide-item">2: 70% to 99% of target</span>
+                                            <span class="rating-guide-item rating-guide-item-focus">3: 100% to 109% of target</span>
+                                            <span class="rating-guide-item">4: 110% to 124% of target</span>
+                                            <span class="rating-guide-item">5: 125% of target or more</span>
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+                            <div class="evaluation-workflow-card review-comments-panel">
+                                <div class="evaluation-step-header">
+                                    <div>
+                                        <span class="evaluation-section-kicker">Review Comments</span>
+                                        <h3>Manager review notes</h3>
+                                    </div>
+                                    <p>Record the supporting comments after the final rating decision so the narrative stays aligned with the evaluation outcome.</p>
+                                </div>
+                                <div class="evaluation-grid evaluation-comments-grid">
+                                    <div class="form-group">
+                                        <label for="kpiMidYearComment">Mid-Year Comment</label>
+                                        <textarea id="kpiMidYearComment" rows="4" placeholder="Enter mid-year feedback, progress summary, strengths, or areas to improve"></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="kpiYearEndComment">Year-End Comment</label>
+                                        <textarea id="kpiYearEndComment" rows="4" placeholder="Enter year-end summary, final achievements, improvement points, and recommendation"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save KPI</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content modal-delete">
+            <div class="modal-header">
+                <h2 id="deleteModalTitle">Delete KPI</h2>
+                <button type="button" class="close-btn" id="closeDeleteBtn">&times;</button>
+            </div>
+            <p id="deleteModalMessage">Are you sure you want to delete this KPI? This action cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelDeleteBtn">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn">Delete KPI</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Details Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content modal-detail">
+            <div class="modal-header">
+                <h2 id="detailModalTitle">KPI Details</h2>
+                <button type="button" class="close-btn" id="closeDetailBtn">&times;</button>
+            </div>
+            <div id="detailContent" class="detail-content">
+                <!-- Details will be populated here -->
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="closeDetailModalBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="smartTooltip" class="smart-tooltip-floating" aria-hidden="true"></div>
+    <input type="file" id="importFileInput" accept=".csv" hidden>
+
+    <script>
+        window.KPI_SUPABASE_CONFIG = {
+            url: 'https://oovdrqxuhclpwrtayvgm.supabase.co',
+            anonKey: 'sb_publishable_pKLSEC8PXiOZH98hFK7q3Q_1cfuvLox',
+            table: 'kpis',
+            seedSampleData: true
+        };
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>
