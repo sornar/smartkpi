@@ -27,6 +27,8 @@ let activeKpiRowMenuId = null;
 let kpiTableDensity = 'comfortable';
 let kpiTableSort = { key: 'name', direction: 'asc' };
 let kpiStore = [];
+let shouldSyncFinalRatingToGuide = true;
+let lastFocusedElement = null;
 const SMART_GUIDE_CONTENT = {
     specific: {
         badge: 'S',
@@ -108,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tableCompactBtn').addEventListener('click', () => setKpiTableDensity('compact'));
     document.getElementById('kpiTarget').addEventListener('input', updateRatingSuggestion);
     document.getElementById('kpiActual').addEventListener('input', updateRatingSuggestion);
-    document.getElementById('kpiRatingGrade').addEventListener('change', updateRatingSuggestion);
+    document.getElementById('kpiRatingGrade').addEventListener('change', handleRatingGradeChange);
     document.getElementById('rating2Min').addEventListener('input', updateRatingSuggestion);
     document.getElementById('rating3Min').addEventListener('input', updateRatingSuggestion);
     document.getElementById('rating4Min').addEventListener('input', updateRatingSuggestion);
@@ -953,7 +955,7 @@ function renderKpiTable() {
         
         html += `
             <tr class="${isSelected ? 'selected-row' : ''}" data-kpi-id="${kpi.id}">
-                <td class="selection-cell">
+                <td class="selection-cell" data-label="Select">
                     <input
                         type="checkbox"
                         class="row-select-checkbox"
@@ -963,17 +965,17 @@ function renderKpiTable() {
                     >
                 </td>
                 <td class="drag-handle" title="Drag to reorder">⋮⋮</td>
-                <td>
+                <td data-label="KPI">
                     <div class="kpi-name-cell">
                         <strong>${escapeHtml(kpi.name)}</strong>
                         <span class="kpi-subtext">${formatDisplayDate(kpi.startDate)} - ${formatDisplayDate(kpi.endDate)}</span>
                     </div>
                 </td>
-                <td>${escapeHtml(kpi.owner)}</td>
-                <td>${escapeHtml(kpi.team)}</td>
-                <td><div class="metric-stack"><strong>${kpi.target}</strong><span>${escapeHtml(kpi.unit)}</span></div></td>
-                <td><div class="metric-stack"><strong>${kpi.actual}</strong><span>${escapeHtml(kpi.unit)}</span></div></td>
-                <td>
+                <td data-label="Owner">${escapeHtml(kpi.owner)}</td>
+                <td data-label="Team">${escapeHtml(kpi.team)}</td>
+                <td data-label="Target"><div class="metric-stack"><strong>${kpi.target}</strong><span>${escapeHtml(kpi.unit)}</span></div></td>
+                <td data-label="Actual"><div class="metric-stack"><strong>${kpi.actual}</strong><span>${escapeHtml(kpi.unit)}</span></div></td>
+                <td data-label="Progress">
                     <div class="table-progress">
                         <div class="table-progress-track">
                             <div class="table-progress-fill" style="width: ${Math.min(progress, 100)}%; background: ${getProgressColor(status)};"></div>
@@ -1148,6 +1150,7 @@ function filterAndRender() {
     renderProgressOverview();
     renderKpiTable();
     updateResultSummary();
+    renderActiveFilterChips();
 }
 
 function clearFilters() {
@@ -1157,6 +1160,66 @@ function clearFilters() {
     document.getElementById('ownerFilter').value = '';
     document.getElementById('statusFilter').value = '';
     filterAndRender();
+}
+
+function getActiveFilters() {
+    const filters = [];
+    const searchValue = document.getElementById('searchInput')?.value.trim();
+    const yearValue = document.getElementById('yearFilter')?.value;
+    const teamValue = document.getElementById('teamFilter')?.value;
+    const ownerValue = document.getElementById('ownerFilter')?.value;
+    const statusValue = document.getElementById('statusFilter')?.value;
+
+    if (searchValue) {
+        filters.push({ key: 'search', label: 'Search', value: searchValue });
+    }
+    if (yearValue) {
+        filters.push({ key: 'year', label: 'Year', value: yearValue });
+    }
+    if (teamValue) {
+        filters.push({ key: 'team', label: 'Team', value: teamValue });
+    }
+    if (ownerValue) {
+        filters.push({ key: 'owner', label: 'Owner', value: ownerValue });
+    }
+    if (statusValue) {
+        filters.push({ key: 'status', label: 'Status', value: statusValue });
+    }
+
+    return filters;
+}
+
+function clearFilterByKey(filterKey) {
+    const filterTargets = {
+        search: 'searchInput',
+        year: 'yearFilter',
+        team: 'teamFilter',
+        owner: 'ownerFilter',
+        status: 'statusFilter'
+    };
+    const targetId = filterTargets[filterKey];
+    const target = targetId ? document.getElementById(targetId) : null;
+
+    if (target) {
+        target.value = '';
+        filterAndRender();
+        target.focus();
+    }
+}
+
+function renderActiveFilterChips() {
+    const chipContainer = document.getElementById('activeFilterChips');
+    if (!chipContainer) {
+        return;
+    }
+
+    const filters = getActiveFilters();
+    chipContainer.innerHTML = filters.map(filter => `
+        <button type="button" class="active-filter-chip" data-clear-filter="${filter.key}" aria-label="Clear ${escapeHtml(filter.label)} filter">
+            <span>${escapeHtml(filter.label)}: ${escapeHtml(filter.value)}</span>
+            <span aria-hidden="true">x</span>
+        </button>
+    `).join('');
 }
 
 function updateResultSummary() {
@@ -1417,13 +1480,20 @@ function isProgressKpiUrgent(kpi, status) {
 
 // Open add KPI modal
 function openAddModal() {
+    rememberFocusBeforeModal();
     editingKpiId = null;
     document.getElementById('modalTitle').textContent = 'Add New KPI';
     document.getElementById('kpiForm').reset();
     setDefaultFormDates();
     setDefaultEvaluationFields();
     document.getElementById('smartWarning').style.display = 'none';
-    document.getElementById('kpiModal').classList.add('active');
+    const modal = document.getElementById('kpiModal');
+    const modalForm = modal?.querySelector('.modal-form');
+    if (modalForm) {
+        modalForm.classList.add('is-create-mode');
+    }
+    modal.classList.add('active');
+    focusFirstModalControl(modal);
 }
 
 // Open edit KPI modal
@@ -1431,6 +1501,8 @@ function editKpi(id) {
     const kpi = getKpiById(id);
     if (!kpi) return;
     
+    rememberFocusBeforeModal();
+    shouldSyncFinalRatingToGuide = false;
     editingKpiId = id;
     document.getElementById('modalTitle').textContent = 'Edit KPI';
     
@@ -1466,17 +1538,26 @@ function editKpi(id) {
     
     checkSmartCriteria();
     updateRatingSuggestion();
-    document.getElementById('kpiModal').classList.add('active');
+    const modal = document.getElementById('kpiModal');
+    const modalForm = modal?.querySelector('.modal-form');
+    if (modalForm) {
+        modalForm.classList.remove('is-create-mode');
+    }
+    modal.classList.add('active');
+    focusFirstModalControl(modal);
 }
 
 // Close KPI modal
 function closeModal() {
     document.getElementById('kpiModal').classList.remove('active');
     editingKpiId = null;
+    shouldSyncFinalRatingToGuide = true;
+    restoreFocusAfterModal();
 }
 
 // Open delete confirmation modal
 function openDeleteModal(id) {
+    rememberFocusBeforeModal();
     pendingDeleteIds = Array.isArray(id) ? id : [id];
     editingKpiId = pendingDeleteIds.length === 1 ? pendingDeleteIds[0] : null;
     document.getElementById('deleteModalTitle').textContent = pendingDeleteIds.length === 1
@@ -1488,7 +1569,9 @@ function openDeleteModal(id) {
     document.getElementById('confirmDeleteBtn').textContent = pendingDeleteIds.length === 1
         ? 'Delete KPI'
         : `Delete ${pendingDeleteIds.length} KPIs`;
-    document.getElementById('deleteModal').classList.add('active');
+    const modal = document.getElementById('deleteModal');
+    modal.classList.add('active');
+    focusFirstModalControl(modal);
 }
 
 // Close delete confirmation modal
@@ -1496,12 +1579,14 @@ function closeDeleteModal() {
     document.getElementById('deleteModal').classList.remove('active');
     pendingDeleteIds = [];
     editingKpiId = null;
+    restoreFocusAfterModal();
 }
 
 // Close detail modal
 function closeDetailModal() {
     document.getElementById('detailModal').classList.remove('active');
     editingKpiId = null;
+    restoreFocusAfterModal();
 }
 
 // View KPI details
@@ -2304,6 +2389,7 @@ function formatDisplayDateTime(value) {
 }
 
 function setDefaultEvaluationFields() {
+    shouldSyncFinalRatingToGuide = true;
     const ratingInput = document.getElementById('kpiRatingGrade');
     if (ratingInput) {
         ratingInput.value = '3';
@@ -2331,6 +2417,29 @@ function setDefaultEvaluationFields() {
 
     updateRatingSuggestion();
     updateEvaluationContextPanel();
+}
+
+function handleRatingGradeChange() {
+    shouldSyncFinalRatingToGuide = false;
+    updateRatingSuggestion();
+}
+
+function rememberFocusBeforeModal() {
+    lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+}
+
+function restoreFocusAfterModal() {
+    if (lastFocusedElement && typeof lastFocusedElement.focus === 'function' && document.contains(lastFocusedElement)) {
+        lastFocusedElement.focus();
+    }
+    lastFocusedElement = null;
+}
+
+function focusFirstModalControl(modalElement) {
+    const firstControl = modalElement?.querySelector('input:not([type="hidden"]), select, textarea, button');
+    if (firstControl && typeof firstControl.focus === 'function') {
+        firstControl.focus();
+    }
 }
 
 function getRatingMeta(grade) {
@@ -2569,6 +2678,11 @@ function updateRatingSuggestion() {
             hasMismatch: false
         });
         return;
+    }
+
+    const recommendedRating = getCalculatedRatingFromPerformance(actualInput.value, targetInput.value, ratingCriteria);
+    if (shouldSyncFinalRatingToGuide && recommendedRating.hasData) {
+        ratingInput.value = String(recommendedRating.grade);
     }
 
     const comparisonState = getRatingComparisonState(actualInput.value, targetInput.value, ratingCriteria, ratingInput.value);
@@ -2944,12 +3058,19 @@ function renderProgressOverview() {
     updateProgressOverviewViewButtons();
     const kpis = getSortedProgressOverviewKpis();
     const visibleLimit = getProgressOverviewLimit();
-    const shouldCollapseWithScroll = !isProgressOverviewExpanded && kpis.length > visibleLimit;
+    const shouldCollapse = !isProgressOverviewExpanded && kpis.length > visibleLimit;
+    const visibleKpis = shouldCollapse ? kpis.slice(0, visibleLimit) : kpis;
 
     container.classList.toggle('is-list-view', progressOverviewView === 'list');
 
     if (kpis.length === 0) {
-        container.innerHTML = '<p class="empty-state">No KPIs match the current filters.</p>';
+        const activeFilters = getActiveFilters();
+        container.innerHTML = `
+            <div class="empty-state empty-state-panel">
+                <strong>No progress cards match these filters.</strong>
+                <span>${activeFilters.length > 0 ? 'Adjust the active filters to bring KPI cards back.' : 'Create a KPI to start tracking progress.'}</span>
+            </div>
+        `;
         container.classList.remove('is-scrollable-collapsed', 'is-list-view');
         container.style.maxHeight = '';
         container.scrollTop = 0;
@@ -2962,7 +3083,7 @@ function renderProgressOverview() {
         return;
     }
 
-    container.innerHTML = kpis.map(kpi => {
+    container.innerHTML = visibleKpis.map(kpi => {
         const progress = calculateProgress(kpi.actual, kpi.target);
         const status = getStatus(progress);
         const progressColor = getProgressColor(status);
@@ -3000,11 +3121,11 @@ function renderProgressOverview() {
         `;
     }).join('');
 
-    applyProgressOverviewScrollState(container, shouldCollapseWithScroll);
+    applyProgressOverviewScrollState(container, false);
 
     if (meta) {
-        meta.textContent = shouldCollapseWithScroll
-            ? `${kpis.length} cards / ${getProgressSortLabel()} / ${progressOverviewView === 'list' ? 'List view' : 'Grid view'} / compact view`
+        meta.textContent = shouldCollapse
+            ? `Showing ${visibleKpis.length} of ${kpis.length} cards / ${getProgressSortLabel()} / ${progressOverviewView === 'list' ? 'List view' : 'Grid view'}`
             : `${kpis.length} cards / ${getProgressSortLabel()} / ${progressOverviewView === 'list' ? 'List view' : 'Grid view'}`;
     }
 
@@ -3060,6 +3181,19 @@ function updateKpiTableDensityButtons() {
 }
 
 function handleDocumentClick(event) {
+    const clearFilterButton = event.target.closest('[data-clear-filter]');
+    if (clearFilterButton) {
+        clearFilterByKey(clearFilterButton.dataset.clearFilter);
+        return;
+    }
+
+    const clearAllButton = event.target.closest('[data-clear-all-filters]');
+    if (clearAllButton) {
+        clearFilters();
+        document.getElementById('searchInput')?.focus();
+        return;
+    }
+
     if (!event.target.closest('.table-row-menu')) {
         if (activeKpiRowMenuId !== null) {
             activeKpiRowMenuId = null;
@@ -3069,6 +3203,20 @@ function handleDocumentClick(event) {
 }
 
 function handleTableBodyClick(event) {
+    const clearFilterButton = event.target.closest('[data-clear-filter]');
+    if (clearFilterButton) {
+        event.stopPropagation();
+        clearFilterByKey(clearFilterButton.dataset.clearFilter);
+        return;
+    }
+
+    const clearAllButton = event.target.closest('[data-clear-all-filters]');
+    if (clearAllButton) {
+        event.stopPropagation();
+        clearFilters();
+        return;
+    }
+
     const detailToggle = event.target.closest('.row-detail-toggle');
     if (detailToggle) {
         toggleKpiRowDetails(Number(detailToggle.dataset.kpiId));
@@ -3287,6 +3435,49 @@ function renderCompactRatingCell(kpi, ratingComparison) {
     `;
 }
 
+function renderFilterRecoveryActions() {
+    const filters = getActiveFilters();
+    if (filters.length === 0) {
+        return '<button type="button" class="btn btn-secondary" id="emptyAddKpiBtn" onclick="openAddModal()">Add KPI</button>';
+    }
+
+    return `
+        <div class="empty-filter-actions">
+            ${filters.map(filter => `
+                <button type="button" class="btn btn-secondary btn-sm" data-clear-filter="${filter.key}">
+                    Clear ${escapeHtml(filter.label)}
+                </button>
+            `).join('')}
+            <button type="button" class="btn btn-primary btn-sm" data-clear-all-filters="true">Show all KPIs</button>
+        </div>
+    `;
+}
+
+function renderEmptyKpiTableState() {
+    const totalCount = getKpiData().length;
+    const filters = getActiveFilters();
+    const filterCopy = filters.length > 0
+        ? `No records match ${filters.map(filter => `${filter.label} "${filter.value}"`).join(', ')}.`
+        : totalCount === 0
+            ? 'No KPI records exist yet.'
+            : 'No KPI records match the current view.';
+    const helperCopy = filters.length > 0
+        ? 'Clear one filter or show the full list to recover the previous results.'
+        : 'Create a KPI to start tracking team performance.';
+
+    return `
+        <tr class="empty-row">
+            <td colspan="11" class="empty-message">
+                <div class="empty-state-panel">
+                    <strong>${escapeHtml(filterCopy)}</strong>
+                    <span>${escapeHtml(helperCopy)}</span>
+                    ${renderFilterRecoveryActions()}
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
 function renderKpiRowDetails(kpi, ratingComparison) {
     const smartItems = [
         ['Specific', kpi.smart?.specific],
@@ -3404,7 +3595,7 @@ function renderKpiTable() {
     }
 
     if (kpis.length === 0) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="11" class="empty-message">No KPI records found</td></tr>';
+        tbody.innerHTML = renderEmptyKpiTableState();
         updateSelectionUi(kpis);
         return;
     }
@@ -3450,11 +3641,11 @@ function renderKpiTable() {
                         <span>${Math.round(progress)}%</span>
                     </div>
                 </td>
-                <td><span class="badge badge-${status.toLowerCase().replace('-', '-')}">${status}</span></td>
-                <td>
+                <td data-label="Status"><span class="badge badge-${status.toLowerCase().replace('-', '-')}">${status}</span></td>
+                <td data-label="Rating">
                     ${renderCompactRatingCell(kpi, ratingComparison)}
                 </td>
-                <td>
+                <td data-label="SMART">
                     <div
                         class="smart-summary-cell smart-criteria-cell"
                         data-smart-tooltip="${escapeHtml(getSmartTooltip(kpi.smart))}"
@@ -3464,7 +3655,7 @@ function renderKpiTable() {
                         ${renderCompactSmartBadge(kpi.smart)}
                     </div>
                 </td>
-                <td>
+                <td data-label="Actions">
                     <div class="table-row-actions">
                         <button
                             type="button"
@@ -3501,6 +3692,7 @@ function viewKpiDetails(id) {
     const kpi = getKpiById(id);
     if (!kpi) return;
 
+    rememberFocusBeforeModal();
     editingKpiId = id;
     const progress = calculateProgress(kpi.actual, kpi.target);
     const status = getStatus(progress);
@@ -3650,7 +3842,9 @@ function viewKpiDetails(id) {
         ${smartDetails}
     `;
 
-    document.getElementById('detailModal').classList.add('active');
+    const modal = document.getElementById('detailModal');
+    modal.classList.add('active');
+    focusFirstModalControl(modal);
 }
 
 function getSmartDetails(smart) {

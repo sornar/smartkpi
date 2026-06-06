@@ -108,21 +108,26 @@
                     <button type="button" class="btn btn-secondary btn-ghost" id="clearFiltersBtn">Clear Filters</button>
                 </div>
                 <div class="filter-controls">
-                    <input 
+                    <label class="sr-only" for="searchInput">Search KPI records</label>
+                    <input
                         type="text" 
                         id="searchInput" 
                         class="search-box" 
                         placeholder="Search KPI name, owner, or team..."
                     >
+                    <label class="sr-only" for="yearFilter">Filter by year</label>
                     <select id="yearFilter" class="filter-select">
                         <option value="">All Years</option>
                     </select>
+                    <label class="sr-only" for="teamFilter">Filter by team</label>
                     <select id="teamFilter" class="filter-select">
                         <option value="">All Teams</option>
                     </select>
+                    <label class="sr-only" for="ownerFilter">Filter by owner</label>
                     <select id="ownerFilter" class="filter-select">
                         <option value="">All Owners</option>
                     </select>
+                    <label class="sr-only" for="statusFilter">Filter by status</label>
                     <select id="statusFilter" class="filter-select">
                         <option value="">All Status</option>
                         <option value="Completed">Completed</option>
@@ -132,7 +137,8 @@
                     </select>
                 </div>
                 <div class="filter-footer">
-                    <div class="result-summary" id="resultSummary">0 KPI records</div>
+                    <div class="result-summary" id="resultSummary" aria-live="polite">0 KPI records</div>
+                    <div class="active-filter-chips" id="activeFilterChips" aria-label="Active filters"></div>
                 </div>
             </section>
 
@@ -188,11 +194,11 @@
     </div>
 
     <!-- KPI Form Modal -->
-    <div id="kpiModal" class="modal">
+    <div id="kpiModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-content modal-form">
             <div class="modal-header">
                 <h2 id="modalTitle">Add New KPI</h2>
-                <button type="button" class="close-btn" id="closeModalBtn">&times;</button>
+                <button type="button" class="close-btn" id="closeModalBtn" aria-label="Close KPI form">&times;</button>
             </div>
 
             <form id="kpiForm" class="kpi-form">
@@ -393,7 +399,7 @@
                 <!-- Evaluation summary section -->
                 <fieldset class="evaluation-fieldset">
                     <legend>Evaluation Summary</legend>
-                    <p class="fieldset-intro">Capture the final performance rating and review comments while keeping the KPI workflow familiar.</p>
+                    <p class="fieldset-intro">Review the calculated recommendation, then use optional review notes when a KPI is ready for performance evaluation.</p>
                     <div class="evaluation-layout">
                         <!-- Evaluation layout and KPI context -->
                         <aside class="evaluation-context-panel">
@@ -508,11 +514,11 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="deleteModal" class="modal">
+    <div id="deleteModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
         <div class="modal-content modal-delete">
             <div class="modal-header">
                 <h2 id="deleteModalTitle">Delete KPI</h2>
-                <button type="button" class="close-btn" id="closeDeleteBtn">&times;</button>
+                <button type="button" class="close-btn" id="closeDeleteBtn" aria-label="Close delete confirmation">&times;</button>
             </div>
             <p id="deleteModalMessage">Are you sure you want to delete this KPI? This action cannot be undone.</p>
             <div class="modal-actions">
@@ -523,11 +529,11 @@
     </div>
 
     <!-- KPI Details Modal -->
-    <div id="detailModal" class="modal">
+    <div id="detailModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
         <div class="modal-content modal-detail">
             <div class="modal-header">
                 <h2 id="detailModalTitle">KPI Details</h2>
-                <button type="button" class="close-btn" id="closeDetailBtn">&times;</button>
+                <button type="button" class="close-btn" id="closeDetailBtn" aria-label="Close KPI details">&times;</button>
             </div>
             <div id="detailContent" class="detail-content">
                 <!-- Details will be populated here -->
