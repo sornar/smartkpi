@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="appStatus" class="app-status" role="status" aria-live="polite" aria-atomic="true" hidden></div>
     <div class="container">
         <!-- Header -->
         <header class="header">
@@ -194,7 +195,7 @@
     </div>
 
     <!-- KPI Form Modal -->
-    <div id="kpiModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div id="kpiModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-hidden="true">
         <div class="modal-content modal-form">
             <div class="modal-header">
                 <h2 id="modalTitle">Add New KPI</h2>
@@ -202,6 +203,7 @@
             </div>
 
             <form id="kpiForm" class="kpi-form">
+                <div id="formFeedback" class="form-feedback" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
                 <!-- Basic Information -->
                 <fieldset>
                     <legend>Basic Information</legend>
@@ -514,7 +516,7 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="deleteModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+    <div id="deleteModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle" aria-hidden="true">
         <div class="modal-content modal-delete">
             <div class="modal-header">
                 <h2 id="deleteModalTitle">Delete KPI</h2>
@@ -529,7 +531,7 @@
     </div>
 
     <!-- KPI Details Modal -->
-    <div id="detailModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
+    <div id="detailModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle" aria-hidden="true">
         <div class="modal-content modal-detail">
             <div class="modal-header">
                 <h2 id="detailModalTitle">KPI Details</h2>
@@ -544,7 +546,7 @@
         </div>
     </div>
 
-    <div id="smartTooltip" class="smart-tooltip-floating" aria-hidden="true"></div>
+    <div id="smartTooltip" class="smart-tooltip-floating" role="tooltip" aria-hidden="true"></div>
     <input type="file" id="importFileInput" accept=".csv" hidden>
 
     <script>

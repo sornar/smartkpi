@@ -29,6 +29,14 @@ let kpiTableSort = { key: 'name', direction: 'asc' };
 let kpiStore = [];
 let shouldSyncFinalRatingToGuide = true;
 let lastFocusedElement = null;
+const FOCUSABLE_SELECTOR = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+].join(', ');
 const SMART_GUIDE_CONTENT = {
     specific: {
         badge: 'S',
@@ -108,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.kpi-table thead').addEventListener('click', handleTableSortClick);
     document.getElementById('tableComfortableBtn').addEventListener('click', () => setKpiTableDensity('comfortable'));
     document.getElementById('tableCompactBtn').addEventListener('click', () => setKpiTableDensity('compact'));
+    document.addEventListener('keydown', handleGlobalKeydown);
     document.getElementById('kpiTarget').addEventListener('input', updateRatingSuggestion);
     document.getElementById('kpiActual').addEventListener('input', updateRatingSuggestion);
     document.getElementById('kpiRatingGrade').addEventListener('change', handleRatingGradeChange);
@@ -150,13 +159,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeDetailBtn = document.getElementById('closeDetailBtn');
     const closeDetailModalBtn = document.getElementById('closeDetailModalBtn');
     
-    console.log('Detail modal setup:', { detailModal: !!detailModal, closeDetailBtn: !!closeDetailBtn, closeDetailModalBtn: !!closeDetailModalBtn });
-    
     if (closeDetailBtn) {
         closeDetailBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Close detail X button clicked');
             closeDetailModal();
         });
     }
@@ -165,7 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
         closeDetailModalBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Close detail modal button clicked');
             closeDetailModal();
         });
     }
@@ -174,7 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (detailModal) {
         detailModal.addEventListener('click', (e) => {
             if (e.target === detailModal) {
-                console.log('Clicking outside detail modal');
                 closeDetailModal();
             }
         });
@@ -195,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 pendingDeleteIds.forEach(id => selectedKpiIds.delete(id));
                 closeDeleteModal();
                 refreshUi({ refreshFilters: true });
-                console.log('KPI records deleted successfully');
+                showAppStatus('KPI records deleted.', 'success');
             }
         });
     }
@@ -213,7 +217,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     initializeApp();
-    console.log('KPI Tracking App initialized');
 });
 
 async function initializeApp() {
@@ -331,7 +334,6 @@ function getLegacyKpiData() {
         const parsedData = data ? JSON.parse(data) : [];
         return Array.isArray(parsedData) ? parsedData.map(normalizeStoredKpiRecord) : [];
     } catch (error) {
-        console.warn('Legacy localStorage data could not be read:', error);
         return [];
     }
 }
@@ -340,7 +342,6 @@ function persistLegacyBackup(kpis) {
     try {
         localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(kpis));
     } catch (error) {
-        console.warn('Local backup could not be updated:', error);
     }
 }
 
@@ -910,7 +911,7 @@ function renderProgressOverview() {
                     <span class="progress-percent">${Math.round(progress)}%</span>
                 </div>
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${Math.min(progress, 100)}%; background: ${progressColor};"></div>
+                    <div class="progress-fill" style="transform: scaleX(${Math.min(progress, 100) / 100}); background: ${progressColor};"></div>
                 </div>
                 <div class="progress-details">
                     <span>${escapeHtml(kpi.owner)} • ${escapeHtml(kpi.team)}</span>
@@ -978,7 +979,7 @@ function renderKpiTable() {
                 <td data-label="Progress">
                     <div class="table-progress">
                         <div class="table-progress-track">
-                            <div class="table-progress-fill" style="width: ${Math.min(progress, 100)}%; background: ${getProgressColor(status)};"></div>
+                            <div class="table-progress-fill" style="transform: scaleX(${Math.min(progress, 100) / 100}); background: ${getProgressColor(status)};"></div>
                         </div>
                         <span>${Math.round(progress)}%</span>
                     </div>
@@ -1478,12 +1479,136 @@ function isProgressKpiUrgent(kpi, status) {
 // MODAL FUNCTIONS
 // ==========================================
 
+function showFormFeedback(message, targetId) {
+    const feedback = document.getElementById('formFeedback');
+    if (!feedback) return;
+    feedback.textContent = message;
+    feedback.hidden = false;
+    feedback.classList.add('is-visible');
+
+    if (targetId) {
+        const target = document.getElementById(targetId);
+        if (target && typeof target.focus === 'function') {
+            target.focus();
+        }
+    }
+}
+
+function clearFormFeedback() {
+    const feedback = document.getElementById('formFeedback');
+    if (!feedback) return;
+    feedback.textContent = '';
+    feedback.hidden = true;
+    feedback.classList.remove('is-visible');
+}
+
+function showAppStatus(message, type = 'info') {
+    const status = document.getElementById('appStatus');
+    if (!status) return;
+    status.textContent = message;
+    status.hidden = false;
+    status.dataset.type = type;
+
+    window.clearTimeout(showAppStatus.timeoutId);
+    showAppStatus.timeoutId = window.setTimeout(() => {
+        status.hidden = true;
+        status.textContent = '';
+        delete status.dataset.type;
+    }, 5200);
+}
+
+function getActiveModal() {
+    return document.querySelector('.modal.active');
+}
+
+function handleGlobalKeydown(event) {
+    const activeModal = getActiveModal();
+    if (activeModal) {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeActiveModal(activeModal);
+            return;
+        }
+
+        if (event.key === 'Tab') {
+            trapModalFocus(event, activeModal);
+        }
+
+        return;
+    }
+
+    handleRowMenuKeydown(event);
+}
+
+function closeActiveModal(modalElement) {
+    if (!modalElement) return;
+    if (modalElement.id === 'kpiModal') closeModal();
+    if (modalElement.id === 'deleteModal') closeDeleteModal();
+    if (modalElement.id === 'detailModal') closeDetailModal();
+}
+
+function setPageInert(isInert) {
+    const page = document.querySelector('.container');
+    if (!page) return;
+
+    if (isInert) {
+        page.setAttribute('aria-hidden', 'true');
+        page.inert = true;
+    } else {
+        page.removeAttribute('aria-hidden');
+        page.inert = false;
+    }
+}
+
+function openModalElement(modalElement) {
+    if (!modalElement) return;
+    setPageInert(true);
+    modalElement.classList.add('active');
+    modalElement.setAttribute('aria-hidden', 'false');
+    focusFirstModalControl(modalElement);
+}
+
+function closeModalElement(modalElement) {
+    if (!modalElement) return;
+    modalElement.classList.remove('active');
+    modalElement.setAttribute('aria-hidden', 'true');
+    if (!getActiveModal()) {
+        setPageInert(false);
+    }
+}
+
+function getFocusableElements(root) {
+    return [...root.querySelectorAll(FOCUSABLE_SELECTOR)]
+        .filter(element => element.offsetParent !== null || element === document.activeElement);
+}
+
+function trapModalFocus(event, modalElement) {
+    const focusableElements = getFocusableElements(modalElement);
+    if (focusableElements.length === 0) {
+        event.preventDefault();
+        modalElement.focus();
+        return;
+    }
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+    }
+}
+
 // Open add KPI modal
 function openAddModal() {
     rememberFocusBeforeModal();
     editingKpiId = null;
     document.getElementById('modalTitle').textContent = 'Add New KPI';
     document.getElementById('kpiForm').reset();
+    clearFormFeedback();
     setDefaultFormDates();
     setDefaultEvaluationFields();
     document.getElementById('smartWarning').style.display = 'none';
@@ -1492,8 +1617,7 @@ function openAddModal() {
     if (modalForm) {
         modalForm.classList.add('is-create-mode');
     }
-    modal.classList.add('active');
-    focusFirstModalControl(modal);
+    openModalElement(modal);
 }
 
 // Open edit KPI modal
@@ -1502,6 +1626,7 @@ function editKpi(id) {
     if (!kpi) return;
     
     rememberFocusBeforeModal();
+    clearFormFeedback();
     shouldSyncFinalRatingToGuide = false;
     editingKpiId = id;
     document.getElementById('modalTitle').textContent = 'Edit KPI';
@@ -1543,15 +1668,15 @@ function editKpi(id) {
     if (modalForm) {
         modalForm.classList.remove('is-create-mode');
     }
-    modal.classList.add('active');
-    focusFirstModalControl(modal);
+    openModalElement(modal);
 }
 
 // Close KPI modal
 function closeModal() {
-    document.getElementById('kpiModal').classList.remove('active');
+    closeModalElement(document.getElementById('kpiModal'));
     editingKpiId = null;
     shouldSyncFinalRatingToGuide = true;
+    clearFormFeedback();
     restoreFocusAfterModal();
 }
 
@@ -1570,13 +1695,12 @@ function openDeleteModal(id) {
         ? 'Delete KPI'
         : `Delete ${pendingDeleteIds.length} KPIs`;
     const modal = document.getElementById('deleteModal');
-    modal.classList.add('active');
-    focusFirstModalControl(modal);
+    openModalElement(modal);
 }
 
 // Close delete confirmation modal
 function closeDeleteModal() {
-    document.getElementById('deleteModal').classList.remove('active');
+    closeModalElement(document.getElementById('deleteModal'));
     pendingDeleteIds = [];
     editingKpiId = null;
     restoreFocusAfterModal();
@@ -1584,7 +1708,7 @@ function closeDeleteModal() {
 
 // Close detail modal
 function closeDetailModal() {
-    document.getElementById('detailModal').classList.remove('active');
+    closeModalElement(document.getElementById('detailModal'));
     editingKpiId = null;
     restoreFocusAfterModal();
 }
@@ -1593,7 +1717,8 @@ function closeDetailModal() {
 function viewKpiDetails(id) {
     const kpi = getKpiById(id);
     if (!kpi) return;
-    
+    rememberFocusBeforeModal();
+
     editingKpiId = id;
     const progress = calculateProgress(kpi.actual, kpi.target);
     const status = getStatus(progress);
@@ -1667,14 +1792,16 @@ function viewKpiDetails(id) {
         <div class="detail-progress-section">
             <h4>Progress Bar</h4>
             <div class="progress-bar" style="height: 12px;">
-                <div class="progress-fill" style="width: ${Math.min(progress, 100)}%; background: ${getProgressColor(status)};"></div>
+                <div class="progress-fill" style="transform: scaleX(${Math.min(progress, 100) / 100}); background: ${getProgressColor(status)};"></div>
             </div>
         </div>
         ${smartDetails}
     `;
     
     document.getElementById('detailContent').innerHTML = detailHTML;
-    document.getElementById('detailModal').classList.add('active');
+    const detailModal = document.getElementById('detailModal');
+    detailModal.classList.add('active');
+    focusFirstModalControl(detailModal);
 }
 
 // Handle form submission
@@ -1710,22 +1837,30 @@ async function handleFormSubmit(e) {
     
     // Validate form
     if (!kpiData.name || !kpiData.owner || !kpiData.team || !kpiData.unit || !kpiData.startDate || !kpiData.endDate) {
-        alert('Please fill in all required fields (marked with *)');
+        const firstMissingId = [
+            ['kpiName', kpiData.name],
+            ['kpiOwner', kpiData.owner],
+            ['kpiTeam', kpiData.team],
+            ['kpiUnit', kpiData.unit],
+            ['kpiStartDate', kpiData.startDate],
+            ['kpiEndDate', kpiData.endDate]
+        ].find(([, value]) => !value)?.[0];
+        showFormFeedback('Fill in all required fields marked with an asterisk before saving.', firstMissingId);
         return;
     }
 
     if (kpiData.startDate > kpiData.endDate) {
-        alert('End date must be the same as or later than the start date.');
+        showFormFeedback('End date must be the same as or later than the start date.', 'kpiEndDate');
         return;
     }
 
     if (kpiData.ratingGrade < 1 || kpiData.ratingGrade > 5) {
-        alert('Please select a rating from 1 to 5.');
+        showFormFeedback('Select a rating from 1 to 5.', 'kpiRatingGrade');
         return;
     }
 
     if (!isValidRatingCriteria(kpiData.ratingCriteria)) {
-        alert('Please keep the rating ranges in ascending order: Rating 2 < Rating 3 < Rating 4 < Rating 5.');
+        showFormFeedback('Keep the rating ranges in ascending order: Rating 2 < Rating 3 < Rating 4 < Rating 5.', 'rating2Min');
         return;
     }
 
@@ -1737,7 +1872,7 @@ async function handleFormSubmit(e) {
     );
 
     if (ratingComparison.hasMismatch && !kpiData.ratingJustification) {
-        alert('Please add a short justification when the final rating differs from the rating guide.');
+        showFormFeedback('Add a short justification when the final rating differs from the rating guide.', 'kpiRatingJustification');
         return;
     }
     
@@ -1745,10 +1880,10 @@ async function handleFormSubmit(e) {
         // Add or update KPI
         if (editingKpiId) {
             await updateKpi(editingKpiId, kpiData);
-            console.log('KPI updated successfully');
+            showAppStatus('KPI updated.', 'success');
         } else {
             await addKpi(kpiData);
-            console.log('KPI added successfully');
+            showAppStatus('KPI added.', 'success');
         }
 
         // Reset and refresh UI
@@ -1770,7 +1905,7 @@ async function handleFormSubmit(e) {
 function exportKpisAsCsv() {
     const rows = getExportRows();
     if (rows.length === 0) {
-        alert('There is no KPI data to export.');
+        showAppStatus('There is no KPI data to export.', 'warning');
         return;
     }
     
@@ -1782,6 +1917,7 @@ function exportKpisAsCsv() {
     
     const csvContent = '\uFEFF' + csvLines.join('\n');
     downloadFile(csvContent, `team-kpi-report-${getTodayFileDate()}.csv`, 'text/csv;charset=utf-8;');
+    showAppStatus(`Exported ${rows.length} KPI records.`, 'success');
 }
 
 // Build export rows from the currently filtered KPI list
@@ -1884,17 +2020,16 @@ function handleImportFile(event) {
                 summary.errors.slice(0, 3).forEach(error => messageLines.push(error));
             }
             
-            alert(messageLines.join('\n'));
+            showAppStatus(messageLines.join(' '), summary.errors.length > 0 ? 'warning' : 'success');
         } catch (error) {
-            console.error('Import failed:', error);
-            alert('Import failed. Please use a CSV file exported from this app.');
+            showAppStatus('Import failed. Please use a CSV file exported from this app.', 'error');
         } finally {
             event.target.value = '';
         }
     };
     
     reader.onerror = () => {
-        alert('The selected file could not be read.');
+        showAppStatus('The selected file could not be read.', 'error');
         event.target.value = '';
     };
     
@@ -2880,6 +3015,7 @@ function attachSmartTooltipListeners() {
     const smartCells = document.querySelectorAll('.smart-criteria-cell');
     
     smartCells.forEach(cell => {
+        cell.setAttribute('aria-describedby', 'smartTooltip');
         cell.addEventListener('mouseenter', showSmartTooltip);
         cell.addEventListener('mousemove', moveSmartTooltip);
         cell.addEventListener('mouseleave', hideSmartTooltip);
@@ -2893,6 +3029,7 @@ function attachSmartHelperTooltipListeners() {
     const helperButtons = document.querySelectorAll('.smart-info-trigger');
 
     helperButtons.forEach(button => {
+        button.setAttribute('aria-describedby', 'smartTooltip');
         button.addEventListener('mouseenter', showSmartTooltip);
         button.addEventListener('mousemove', moveSmartTooltip);
         button.addEventListener('mouseleave', hideSmartTooltip);
@@ -3037,9 +3174,8 @@ function buildSmartCriteriaTooltipMarkup(text) {
 }
 
 function handlePersistenceError(message, error) {
-    console.error(message, error);
     const detail = error instanceof Error ? error.message : 'Unknown error';
-    alert(`${message}\n\n${detail}`);
+    showAppStatus(`${message} ${detail}`, 'error');
 }
 
 // ==========================================
@@ -3106,7 +3242,7 @@ function renderProgressOverview() {
                 </div>
                 <div class="progress-bar-wrap">
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${Math.min(progress, 100)}%; background: ${progressColor};"></div>
+                        <div class="progress-fill" style="transform: scaleX(${Math.min(progress, 100) / 100}); background: ${progressColor};"></div>
                     </div>
                     <div class="progress-details">
                         <span>Actual ${formatProgressMetricValue(kpi.actual)} ${escapeHtml(kpi.unit)}</span>
@@ -3202,6 +3338,39 @@ function handleDocumentClick(event) {
     }
 }
 
+function handleRowMenuKeydown(event) {
+    const menuToggle = event.target.closest('.row-menu-toggle');
+    const menuAction = event.target.closest('.row-menu-action');
+
+    if (menuToggle && ['Enter', ' ', 'ArrowDown'].includes(event.key)) {
+        event.preventDefault();
+        toggleKpiRowMenu(Number(menuToggle.dataset.kpiId), true);
+        return;
+    }
+
+    if (!menuAction) return;
+
+    const menu = menuAction.closest('.table-row-menu');
+    const actions = [...menu.querySelectorAll('.row-menu-action')];
+    const currentIndex = actions.indexOf(menuAction);
+
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        const kpiId = Number(menuAction.dataset.kpiId);
+        activeKpiRowMenuId = null;
+        renderKpiTable();
+        focusRowMenuToggle(kpiId);
+        return;
+    }
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex = (currentIndex + direction + actions.length) % actions.length;
+        actions[nextIndex].focus();
+    }
+}
+
 function handleTableBodyClick(event) {
     const clearFilterButton = event.target.closest('[data-clear-filter]');
     if (clearFilterButton) {
@@ -3232,6 +3401,7 @@ function handleTableBodyClick(event) {
 
     const menuAction = event.target.closest('.row-menu-action');
     if (menuAction) {
+        event.stopPropagation();
         const kpiId = Number(menuAction.dataset.kpiId);
         const action = menuAction.dataset.action;
         activeKpiRowMenuId = null;
@@ -3259,9 +3429,18 @@ function toggleKpiRowDetails(kpiId) {
     renderKpiTable();
 }
 
-function toggleKpiRowMenu(kpiId) {
+function toggleKpiRowMenu(kpiId, focusFirstAction = false) {
     activeKpiRowMenuId = activeKpiRowMenuId === kpiId ? null : kpiId;
     renderKpiTable();
+
+    if (focusFirstAction && activeKpiRowMenuId === kpiId) {
+        const firstAction = document.querySelector(`.table-row-menu.is-open .row-menu-action[data-kpi-id="${kpiId}"]`);
+        firstAction?.focus();
+    }
+}
+
+function focusRowMenuToggle(kpiId) {
+    document.querySelector(`.row-menu-toggle[data-kpi-id="${kpiId}"]`)?.focus();
 }
 
 function handleTableSortClick(event) {
@@ -3636,7 +3815,7 @@ function renderKpiTable() {
                 <td>
                     <div class="table-progress">
                         <div class="table-progress-track">
-                            <div class="table-progress-fill" style="width: ${Math.min(progress, 100)}%; background: ${getProgressColor(status)};"></div>
+                            <div class="table-progress-fill" style="transform: scaleX(${Math.min(progress, 100) / 100}); background: ${getProgressColor(status)};"></div>
                         </div>
                         <span>${Math.round(progress)}%</span>
                     </div>
@@ -3666,8 +3845,16 @@ function renderKpiTable() {
                             ${isExpanded ? 'Hide' : 'Details'}
                         </button>
                         <div class="table-row-menu ${isMenuOpen ? 'is-open' : ''}">
-                            <button type="button" class="row-menu-toggle" data-kpi-id="${kpi.id}" aria-label="More actions for ${escapeHtml(kpi.name)}">...</button>
-                            <div class="row-menu-list" role="menu">
+                            <button
+                                type="button"
+                                class="row-menu-toggle"
+                                data-kpi-id="${kpi.id}"
+                                aria-label="More actions for ${escapeHtml(kpi.name)}"
+                                aria-haspopup="menu"
+                                aria-expanded="${isMenuOpen ? 'true' : 'false'}"
+                                aria-controls="rowMenu${kpi.id}"
+                            >...</button>
+                            <div class="row-menu-list" id="rowMenu${kpi.id}" role="menu" aria-label="Actions for ${escapeHtml(kpi.name)}">
                                 <button type="button" class="row-menu-action" data-kpi-id="${kpi.id}" data-action="view" role="menuitem">View Full</button>
                                 <button type="button" class="row-menu-action" data-kpi-id="${kpi.id}" data-action="edit" role="menuitem">Edit</button>
                                 <button type="button" class="row-menu-action is-danger" data-kpi-id="${kpi.id}" data-action="delete" role="menuitem">Delete</button>
@@ -3835,7 +4022,7 @@ function viewKpiDetails(id) {
         <div class="detail-progress-section">
             <h4>Progress Bar</h4>
             <div class="progress-bar detail-progress-bar">
-                <div class="progress-fill" style="width: ${Math.min(progress, 100)}%; background: ${getProgressColor(status)};"></div>
+                <div class="progress-fill" style="transform: scaleX(${Math.min(progress, 100) / 100}); background: ${getProgressColor(status)};"></div>
             </div>
         </div>
         ${evaluationSummary}
@@ -3843,8 +4030,7 @@ function viewKpiDetails(id) {
     `;
 
     const modal = document.getElementById('detailModal');
-    modal.classList.add('active');
-    focusFirstModalControl(modal);
+    openModalElement(modal);
 }
 
 function getSmartDetails(smart) {
